@@ -1,0 +1,90 @@
+from xml.etree.ElementTree import Comment ## https://docs.python.org/3/library/xml.etree.elementtree.html
+import flask
+import logging
+import datetime
+from flask import jsonify
+from flask import json
+from flask import request, make_response
+from test import create_connection
+from test import execute_read_query
+from test import execute_query
+
+
+#setting up an application name as learned in class
+app = flask.Flask(__name__) #sets up the application as learned in class
+app.config["DEBUG"] = True #allow to show errors in browser as learned in class
+conn = create_connection('spring3368.cjmq4vcziw68.us-east-2.rds.amazonaws.com', 'admin', 'Lenovouser3368', 'spring3368db')
+
+@app.route('/', methods=['GET']) # default url and home page reference to class
+def home():
+    return "<h1> WELCOME TO OUR FIRST API! </h1>"
+
+# GET Database table API Reference: Class
+@app.route('/api/animal', methods=['GET']) 
+def api_all(): 
+    sql = 'Select * from zoo'
+    animal = execute_read_query(conn, sql)
+    return jsonify(animal) #Legible in jsonify as learned in class
+
+
+# Following API learned in class, Reference: https://reqbin.com/req/2xhbguy8/json-payload-example
+@app.route('/api/animal', methods=['POST']) # add animal as POST: http://127.0.0.1:5000/api/animal
+def add_animal():          
+    request_data = request.get_json()   
+    newanimal = request_data['animal']   
+    newgender = request_data['gender']
+    newsubtype = request_data['subtype']
+    newage = request_data['age']
+    newcolor = request_data['color']                       
+    sql = "INSERT into zoo(animal, gender, subtype, age, color) Values ('%s','%s','%s','%s','%s')" % (newanimal, newgender, newsubtype, newage, newcolor)
+    execute_query(conn, sql)
+    #Logging the insert using date, comment Reference: https://www.geeksforgeeks.org/logging-in-python/
+    logcomment = 'A new %s that is %s has been added to the zoo.' % (newanimal, newgender)
+    currentdate = datetime.date.today()
+    sql2 = """Insert into datalogs (date, animalid, comment) Values ('%s', last_insert_id(), '%s')""" % (currentdate, logcomment)
+    execute_query(conn, sql2)
+    return  "Add Request Successful"
+
+@app.route('/api/animal', methods=['PUT']) # update animal as PUT: http://127.0.0.1:5000/api/animal         
+def update_zoo():          
+    request_data = request.get_json()
+    zooid = request_data['id']   
+    newnewanimal = request_data['animal']   
+    newnewgender = request_data['gender']
+    newnewsubtype = request_data['subtype']
+    newnewage = request_data['age']
+    newnewcolor = request_data['color']                       
+    sql = "UPDATE zoo SET animal = '%s', gender = '%s', subtype = '%s', age = '%s', color = '%s' WHERE id = '%s'" % (newnewanimal, newnewgender, newnewsubtype, newnewage, newnewcolor, zooid)
+    execute_query(conn, sql)
+    return 'Update request Successful'
+
+@app.route('/api/animal/d', methods=['POST'] ) # Delete animal as DELETE: http://127.0.0.1:5000/api/animal/d
+def delete_animal():        
+    request_data = request.get_json()  
+    newzooid = request_data['id']   
+    sql = 'DELETE from zoo WHERE id = %s' % (newzooid)     
+    execute_query(conn, sql)
+    #Logging the delete using date, comment Reference: https://www.geeksforgeeks.org/logging-in-python/
+    logcomment = 'A animal with the id of %s has been removed from the zoo.' % (newzooid)
+    currentdate = datetime.date.today()
+    sql2 = """Insert into datalogs (date, animalid, comment) Values ('%s', '%s', '%s')""" % (currentdate, newzooid, logcomment)
+    execute_query(conn, sql2)
+    return 'Delete request successful'
+
+
+
+# GET Logs Database table API Reference: Class
+@app.route('/api/logs', methods=['GET']) # GET all logs as Get: http://127.0.0.1:5000/api/logs
+def api_log_all(): 
+    sql = 'Select * from datalogs'
+    logs = execute_read_query(conn, sql)
+    return jsonify(logs) #Legible in jsonify as learned in class
+
+@app.route('/api/logs?reset=true', methods=['PUT']) #delete animal as PUT: http://127.0.0.1:5000/api/logs?reset=true        
+def delete_logs():                                 
+    sql = 'DELETE from datalogs'
+    execute_query(conn, sql)
+    return 'Delete all logs Successful'
+
+
+app.run()
